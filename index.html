@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Caffeine Coder – Eddie Chan</title>
+  <title>Caffeine Coder – Andy Chan</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
@@ -401,6 +401,20 @@
       margin: 0 auto;
     }
 
+    /* ===== SPOTLIGHT ===== */
+    #spotlight {
+      pointer-events: none;
+      position: fixed;
+      width: 500px;
+      height: 500px;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      background: radial-gradient(circle, rgba(247,129,102,.13) 0%, transparent 70%);
+      z-index: 2;
+      opacity: 0;
+      transition: opacity .3s;
+    }
+
     /* ===== FADE-IN ANIMATION ===== */
     .fade-in {
       opacity: 0;
@@ -442,7 +456,7 @@
       </div>
       <div class="hero-text">
         <p class="section-label">// hello, world</p>
-        <h1>Hi, I'm <span>Eddie Chan</span></h1>
+        <h1>Hi, I'm <span>Andy Chan</span></h1>
         <p class="tagline">aka Caffeine Coder ☕</p>
         <p class="bio">Coffee and Code made my day! Building cool stuff from Hong Kong — one commit at a time.</p>
         <div class="hero-badges">
@@ -470,10 +484,10 @@
           </a>
         </div>
         <div class="stats-bar fade-in">
-          <div class="stat-item"><div class="num">49</div><div class="lbl">Public Repos</div></div>
-          <div class="stat-item"><div class="num">6</div><div class="lbl">Followers</div></div>
-          <div class="stat-item"><div class="num">82</div><div class="lbl">Total Projects</div></div>
-          <div class="stat-item"><div class="num">8+</div><div class="lbl">Years on GitHub</div></div>
+          <div class="stat-item"><div class="num" id="stat-repos">—</div><div class="lbl">Public Repos</div></div>
+          <div class="stat-item"><div class="num" id="stat-followers">—</div><div class="lbl">Followers</div></div>
+          <div class="stat-item"><div class="num" id="stat-following">—</div><div class="lbl">Following</div></div>
+          <div class="stat-item"><div class="num" id="stat-years">—</div><div class="lbl">Years on GitHub</div></div>
         </div>
       </div>
     </div>
@@ -648,13 +662,102 @@
     <p>Built with <span>♥</span> by Caffeine Coder · © 2026 Andy Chan · Hong Kong</p>
   </footer>
 
-  <!-- SCROLL ANIMATION -->
+  <!-- SPOTLIGHT -->
+  <div id="spotlight"></div>
+
+  <!-- SCRIPTS -->
   <script>
-    const observer = new IntersectionObserver(
+    /* ── Fade-in on scroll ── */
+    const fadeObserver = new IntersectionObserver(
       entries => entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); }),
       { threshold: 0.1 }
     );
-    document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+    document.querySelectorAll('.fade-in').forEach(el => fadeObserver.observe(el));
+
+    /* ── Mouse-follow spotlight on hero ── */
+    const spotlight = document.getElementById('spotlight');
+    document.getElementById('hero').addEventListener('mousemove', e => {
+      spotlight.style.opacity = '1';
+      spotlight.style.left = e.clientX + 'px';
+      spotlight.style.top  = e.clientY + 'px';
+    });
+    document.getElementById('hero').addEventListener('mouseleave', () => {
+      spotlight.style.opacity = '0';
+    });
+
+    /* ── Animated number counter ── */
+    function animateCounter(el, target, suffix = '') {
+      const duration = 1400;
+      const step = 16;
+      const steps = Math.ceil(duration / step);
+      let current = 0;
+      const inc = target / steps;
+      const timer = setInterval(() => {
+        current += inc;
+        if (current >= target) {
+          el.textContent = target + suffix;
+          clearInterval(timer);
+        } else {
+          el.textContent = Math.floor(current) + suffix;
+        }
+      }, step);
+    }
+
+    /* ── Fetch live GitHub stats ── */
+    (async () => {
+      try {
+        const res = await fetch('https://api.github.com/users/unrealandychan');
+        if (!res.ok) throw new Error('API error');
+        const data = await res.json();
+
+        const joined = new Date(data.created_at);
+        const years  = new Date().getFullYear() - joined.getFullYear();
+
+        const stats = [
+          { id: 'stat-repos',     value: data.public_repos, suffix: '' },
+          { id: 'stat-followers', value: data.followers,    suffix: '' },
+          { id: 'stat-following', value: data.following,    suffix: '' },
+          { id: 'stat-years',     value: years,             suffix: '+' },
+        ];
+
+        /* Observe each stat element; animate when it enters the viewport */
+        const counterObserver = new IntersectionObserver(entries => {
+          entries.forEach(e => {
+            if (e.isIntersecting && !e.target.dataset.animated) {
+              e.target.dataset.animated = '1';
+              const s = stats.find(x => x.id === e.target.id);
+              if (s) animateCounter(e.target, s.value, s.suffix);
+            }
+          });
+        }, { threshold: 0.5 });
+
+        stats.forEach(s => {
+          const el = document.getElementById(s.id);
+          if (el) { el.textContent = '0'; counterObserver.observe(el); }
+        });
+
+      } catch (err) {
+        /* Fallback: show static values if API fails */
+        const fallbacks = { 'stat-repos': '49', 'stat-followers': '6', 'stat-following': '8', 'stat-years': '8+' };
+        Object.entries(fallbacks).forEach(([id, val]) => {
+          const el = document.getElementById(id);
+          if (el) el.textContent = val;
+        });
+      }
+    })();
+
+    /* ── Typewriter for tagline ── */
+    const tagEl = document.querySelector('.tagline');
+    const tagText = tagEl.textContent;
+    tagEl.textContent = '';
+    let i = 0;
+    function typeWriter() {
+      if (i < tagText.length) {
+        tagEl.textContent += tagText[i++];
+        setTimeout(typeWriter, 55);
+      }
+    }
+    setTimeout(typeWriter, 600);
   </script>
 
 </body>
